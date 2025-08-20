@@ -1,0 +1,196 @@
+
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>WA Multi — Electron (local)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#0c0c0c; color:#f3f3f3; }
+    header { background:#111; padding:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+    input, button { padding:8px 10px; border-radius:10px; border:1px solid #333; background:#1a1a1a; color:#fff; }
+    button { cursor:pointer; }
+    button:hover { background:#262626; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap:10px; padding:10px; }
+    .tile { background:#151515; border:1px solid #2a2a2a; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+    .tile header { background:#1a1a1a; display:flex; align-items:center; gap:6px; padding:6px 8px; }
+    .grow { flex:1 }
+    .big { grid-column: 1 / -1; height: calc(100vh - 120px); }
+    .bar { display:flex; gap:6px; align-items:center; }
+    webview { width:100%; height:560px; background:#000; }
+    .selected { outline: 2px solid #5ea3ff; }
+    .dim { opacity:.7 }
+    .zoomWrap { display:flex; align-items:center; gap:6px; }
+    .zoomInput { width:72px; text-align:right; }
+    .zoomLbl { min-width: 64px; text-align:right; opacity:.85 }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <button id="btnAdd">+ Adicionar</button>
+      <button id="btnRemove">Remover</button>
+      <button id="btnMax">Maximizar</button>
+      <button id="btnRes">Restaurar</button>
+      <button id="btnZoomOut">−10%</button>
+      <button id="btnZoomIn">+10%</button>
+      <button id="btnReload">Recarregar</button>
+    </div>
+    <span class="grow"></span>
+    <small class="dim">Selecione um tile. ± muda 10%. Você também pode digitar o %.</small>
+  </header>
+
+  <div id="grid" class="grid"></div>
+
+  <template id="tpl">
+    <div class="tile">
+      <header>
+        <strong class="title"></strong>
+        <span class="grow"></span>
+        <div class="zoomWrap">
+          <input class="zoomInput" type="number" min="30" max="300" step="1">
+          <span class="zoomLbl"></span>
+        </div>
+      </header>
+      <webview class="wv" allowpopups disableblinkfeatures="TranslateUI"></webview>
+    </div>
+  </template>
+
+  <script>
+    let state = { ids: ['A','B'], zoom: {} };
+    let UA = '';
+    let selectedId = null;
+
+    const btn = id => document.getElementById(id);
+    const viewOf = id => document.querySelector(`.tile[data-id="${css(id)}"] webview`);
+    const tileOf = id => document.querySelector(`.tile[data-id="${css(id)}"]`);
+    const css = s => String(s).replace(/"/g, '\\"');
+
+    async function init(){
+      UA = await window.waAPI.userAgent();
+      state = await window.waAPI.loadState();
+      render();
+      bindToolbar();
+    }
+
+    function bindToolbar(){
+      btn('btnAdd').onclick = ()=>{
+        const id = nextId();
+        state.ids.push(id);
+        render(); persist();
+        setTimeout(()=>selectAndFocus(id), 0);
+      };
+      btn('btnRemove').onclick = ()=>{
+        if(!selectedId) return;
+        state.ids = state.ids.filter(x => x !== selectedId);
+        selectedId = null;
+        render(); persist();
+      };
+      btn('btnZoomIn').onclick = ()=> nudgeZoom(+10);
+      btn('btnZoomOut').onclick = ()=> nudgeZoom(-10);
+      btn('btnReload').onclick = ()=>{ const wv = viewOf(selectedId); wv && wv.reload(); };
+      btn('btnMax').onclick = ()=>{
+        if(!selectedId) return;
+        document.querySelectorAll('.tile').forEach(el => el.classList.remove('big'));
+        tileOf(selectedId)?.classList.add('big');
+      };
+      btn('btnRes').onclick = ()=>{ document.querySelectorAll('.tile').forEach(el => el.classList.remove('big')); };
+    }
+
+    function nextId(){
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      for (const c of letters) if (!state.ids.includes(c)) return c;
+      let i = 1; while (state.ids.includes('S'+i)) i++; return 'S'+i;
+    }
+
+    async function render(){
+      const grid = document.getElementById('grid'); grid.innerHTML = '';
+      for(const id of state.ids){
+        const node = document.getElementById('tpl').content.cloneNode(true);
+        const tile = node.querySelector('.tile'); tile.dataset.id = id;
+        const title = node.querySelector('.title'); title.textContent = 'WA ' + id;
+        const zoomLbl = node.querySelector('.zoomLbl');
+        const zoomInput = node.querySelector('.zoomInput');
+        const wv = node.querySelector('.wv');
+        const z = clampZoom(state.zoom[id] || 1.0);
+
+        wv.setAttribute('partition', 'persist:wa_'+id);
+        wv.setAttribute('useragent', UA);
+        wv.addEventListener('dom-ready', ()=>{
+          try { wv.setZoomFactor(z); } catch {}
+          refreshZoomUI(id);
+        });
+        wv.addEventListener('did-fail-load', (_e, ec, desc, url)=>{
+          console.error('[did-fail-load]', id, ec, desc, url);
+        });
+        wv.src = 'https://web.whatsapp.com';
+
+        tile.addEventListener('click', ()=>selectAndFocus(id));
+
+        zoomInput.addEventListener('change', ()=>{
+          const p = clampPercent(parseInt(zoomInput.value || '100', 10));
+          applyZoom(id, p/100);
+        });
+
+        zoomInput.value = Math.round(z*100);
+        zoomLbl.textContent = `(${Math.round(z*100)}%)`;
+
+        grid.appendChild(node);
+      }
+      if (!selectedId && state.ids.length) selectAndFocus(state.ids[0]);
+    }
+
+    function selectAndFocus(id){
+      document.querySelectorAll('.tile').forEach(t=>t.classList.remove('selected'));
+      selectedId = id;
+      tileOf(id)?.classList.add('selected');
+    }
+
+    function clampZoom(f){ return Math.max(0.3, Math.min(3, Number(f)||1)); }
+    function clampPercent(p){ return Math.max(30, Math.min(300, Number(p)||100)); }
+
+    function nudgeZoom(deltaPercent){
+      if(!selectedId) return;
+      const wv = viewOf(selectedId); if(!wv) return;
+      wv.getZoomFactor(current => {
+        const p = clampPercent(Math.round(current*100) + deltaPercent);
+        applyZoom(selectedId, p/100);
+      });
+    }
+
+    function applyZoom(id, factor){
+      const wv = viewOf(id); if(!wv) return;
+      const f = clampZoom(factor);
+      try { wv.setZoomFactor(f); } catch {}
+      state.zoom[id] = f;
+      persist();
+      const tile = tileOf(id);
+      if (tile){
+        const lbl = tile.querySelector('.zoomLbl');
+        const input = tile.querySelector('.zoomInput');
+        if (input) input.value = Math.round(f*100);
+        if (lbl) lbl.textContent = `(${Math.round(f*100)}%)`;
+      }
+      setTimeout(()=>refreshZoomUI(id), 0);
+    }
+
+    function refreshZoomUI(id){
+      const wv = viewOf(id); if(!wv) return;
+      wv.getZoomFactor(actual => {
+        const tile = tileOf(id);
+        if (tile){
+          const lbl = tile.querySelector('.zoomLbl');
+          const input = tile.querySelector('.zoomInput');
+          if (input) input.value = Math.round(actual*100);
+          if (lbl) lbl.textContent = `(${Math.round(actual*100)}%)`;
+        }
+      });
+    }
+
+    async function persist(){ await window.waAPI.saveState(state); }
+
+    init();
+  </script>
+</body>
+</html>
