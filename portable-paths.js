@@ -18,7 +18,7 @@ if (process.env.PORTABLE_EXECUTABLE_DIR) return process.env.PORTABLE_EXECUTABLE_
 // 2) Empacotado: usa a pasta do executável
 if (!isDev) return path.dirname(process.execPath);
 // 3) Dev: usa a pasta do projeto (onde você executa `electron .`)
-return process.cwd();
+return process.cwd(); 
 }
 
 
