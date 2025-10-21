@@ -703,7 +703,7 @@ in the Software without restriction...
 
 - **Issues**: [GitHub Issues](https://github.com/seu-usuario/wa-multi-electron/issues)
 - **Documentação**: Veja arquivos `.md` no repositório
-- **Email**: seu-email@exemplo.com
+- **Email**: www.silvarocha.com@gmail.com
 
 ---
 
