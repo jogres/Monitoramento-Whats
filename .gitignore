@@ -1,0 +1,39 @@
+# Dependências (NÃO enviar - muito grandes!)
+node_modules/
+package-lock.json
+npm-debug.log*
+
+# Builds (NÃO enviar para GitHub - muito grandes!)
+dist/
+build/
+
+# Dados do usuário (gerados automaticamente)
+data/
+
+# Cache do Electron
+*.log
+*.log.*
+
+# Arquivos temporários
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git backup
+.git-old-backup/
+
+# Sistema
+.env
+.env.local
+
+# Electron Builder
+electron-builder.yml
+

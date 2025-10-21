@@ -1,0 +1,74 @@
+{
+  "name": "wa-multi-electron",
+  "version": "1.3.0",
+  "description": "Local-only Electron app: multiple WhatsApp Web sessions with native controls and Windows installer (.exe) via electron-builder (NSIS & NSIS-Web).",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis",
+    "dist:win:web": "electron-builder --win nsis-web",
+    "dist:win:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^30.0.6",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.seuprojeto.wamulti",
+    "productName": "WA Multi",
+    "asar": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "public/**/*",
+      "package.json",
+      "!public/index.html.bak"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "nsis-web",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "signingHashAlgorithms": ["sha256"],
+      "sign": null
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": "always",
+      "shortcutName": "WA Multi"
+    },
+    "nsisWeb": {
+      "artifactName": "${productName}-WebSetup-${version}.${ext}",
+      "appPackageUrl": "https://SEU-DOMINIO/downloads/WA-Multi/${version}/"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://SEU-DOMINIO/downloads/WA-Multi/"
+      }
+    ]
+  }
+}
